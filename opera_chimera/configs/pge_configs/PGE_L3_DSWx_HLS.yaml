@@ -1,0 +1,154 @@
+#######################################################################
+# PGE configuration for L3_DSWx_HLS.
+#######################################################################
+
+# The runconfig section is intended to be used for dynamically generating the runconfig file used
+# when running the OPERA PGEs. Any values set with a "__CHIMERA_VAL__" should be filled in by the input
+# preprocessor. Otherwise, a precondition evaluation error will be raised by chimera.
+#
+# The runconfig section is also used as the data dict for the RunConfig jinja2 template.
+# Accordingly, the schema here does NOT need to match the final RunConfig.yaml schema.
+#
+# * See RunConfig_schema.<label>.yaml for RunConfig.yaml documentation.
+# * See related `RunConfig.yaml.<label>.jinja2.tmpl` file
+#  and `util.conf_util.RunConfig.__init__()` for jinja2 usage.
+runconfig:
+  input_file_group:
+    input_file_path: []
+  dynamic_ancillary_file_group:
+    # Digital elevation model
+    dem_file:  __CHIMERA_VAL__
+    # Copernicus Global Land Service (CGLS) Land Cover Layer file
+    landcover_file: __CHIMERA_VAL__
+    # ESA WorldCover map file
+    worldcover_file: __CHIMERA_VAL__
+  product_path_group:
+    product_version: __CHIMERA_VAL__
+    product_path: output_dir
+    # Scratch path is defined relative to output_dir to avoid file system permission issues
+    scratch_path: output_dir/scratch_dir
+  hls_thresholds:
+    wigt: __CHIMERA_VAL__           # Modified Normalized Difference Wetness Index (MNDWI) Threshold
+    awgt: __CHIMERA_VAL__           # Automated Water Extent Shadow Threshold
+    pswt_1_mndwi: __CHIMERA_VAL__   # Partial Surface Water Test-1 MNDWI Threshold
+    pswt_1_nir: __CHIMERA_VAL__     # Partial Surface Water Test-1 NIR Threshold
+    pswt_1_swir1: __CHIMERA_VAL__   # Partial Surface Water Test-1 SWIR1 Threshold
+    pswt_1_ndvi: __CHIMERA_VAL__    # Partial Surface Water Test-1 NDVI Threshold
+    pswt_2_mndwi: __CHIMERA_VAL__   # Partial Surface Water Test-2 MNDWI Threshold
+    pswt_2_blue: __CHIMERA_VAL__    # Partial Surface Water Test-2 Blue Threshold
+    pswt_2_nir: __CHIMERA_VAL__     # Partial Surface Water Test-2 NIR Threshold
+    pswt_2_swir1: __CHIMERA_VAL__   # Partial Surface Water Test-2 SWIR1 Threshold
+    pswt_2_swir2: __CHIMERA_VAL__   # Partial Surface Water Test-2 SWIR2 Threshold
+    lcmask_nir: __CHIMERA_VAL__     # Land Cover Mask based test Near Infrared
+  cnm_version: "__CHIMERA_VAL__"
+
+  product_paths:
+    # references an output dict entry of a precondition function to pass remote product URL onto localization phase.
+    L2_HLS: __CHIMERA_VAL__
+
+# This lists all the precondition evaluation steps that this PGE needs to run prior to running the PGE.
+preconditions:
+  - get_product_version
+  - get_metadata
+  - get_hls_dswx_pge_input_filepaths
+  - get_cnm_version
+  - set_daac_product_type
+  - get_dswx_hls_dem
+  - get_landcover
+  - get_worldcover
+
+# This lists all the postprocessor steps that this PGE will run after running the PGE.
+postprocess:
+  - update_product_accountability
+
+get_product_version:
+  version_key: "DSWX_HLS_PRODUCT_VERSION"
+
+# For any of the precondition evaluation steps listed in the preconditions area,
+# specify function arguments here
+get_metadata:
+  keys:
+    - wigt
+    - awgt
+    - pswt_1_mndwi
+    - pswt_1_nir
+    - pswt_1_swir1
+    - pswt_1_ndvi
+    - pswt_2_mndwi
+    - pswt_2_blue
+    - pswt_2_nir
+    - pswt_2_swir1
+    - pswt_2_swir2
+    - lcmask_nir
+
+get_dswx_hls_dem:
+  # Specify a specific bounding box to obtain the corresponding DEM for.
+  # If not provided, the bounding box will be determined based on the tile code
+  # of the HLS dataset to be processed
+  #bbox: [-122.121, 36.321, -121.84, 36.556]
+  bbox: []
+  # The s3 bucket containing the global DEM(s) to download regions from
+  s3_bucket: "opera-dem"
+
+get_landcover:
+  # The s3 location of the global landcover file to use with each DSWx-HLS job
+  s3_bucket: "opera-land-cover"
+  s3_key: "PROBAV_LC100_global_v3.0.1_2019-nrt_Discrete-Classification-map_EPSG-4326.tif"
+
+get_worldcover:
+  # Specify a specific bounding box to obtain the corresponding Worldcover map for.
+  # If not provided, the bounding box will be determined based on the tile code
+  # of the HLS dataset to be processed
+  #bbox: [-122.121, 36.321, -121.84, 36.556]
+  bbox: []
+  # The s3 bucket containing the full Worldcover file to download regions from
+  s3_bucket: "opera-world-cover"
+  # Parameters used to select the Worldcover version and year to download from
+  # These become parts of the s3 key used to lookup the Worldcover file in S3
+  # They should only be changed when updated Worldcover files are available (yearly)
+  worldcover_version: "v100"
+  worldcover_year: "2020"
+
+set_daac_product_type:
+  template: OPERA_L3_DSWX_HLS_{cnm_version}
+
+# This function will add to the PGE output metadata when product to dataset conversion is performed
+set_extra_pge_output_metadata:
+   daac_product_type: daac_product_type
+
+# List the extensions that the PGE generates
+output_types:
+  L3_DSWx_HLS:
+    - tiff
+    - png
+    - catalog.json
+    - iso.xml
+    - log
+    - qa.log
+
+# The PGE name
+# This must MATCH the corresponding entry in pge_outputs.yaml
+pge_name: "L3_DSWx_HLS"
+
+# Set the primary input/output types here
+primary_input: "L2_HLS_L30"
+primary_output: "L3_DSWx_HLS"
+
+# List the groups that Chimera will need to localize
+# The entries MUST reference a property of `$.runconfig` of this YAML.
+# The referenced properties MUST be maps.
+localize_groups:
+  - product_paths
+  - dynamic_ancillary_file_group
+
+
+#######################################################################
+# PGE Simulation Mode
+#
+# * See PGE_SIMULATION_MODE in settings.yaml and it's usage
+# * See SIMULATE_OUTPUTS usage in opera_pge_wrapper.py and chimera.precondition_evaluator.py
+#######################################################################
+input_file_base_name_regexes: # regexes taken from settings.yaml > L2_HLS_L30 and L2_HLS_S30
+    - '(?P<id>(?P<product_shortname>HLS[.]L30)[.](?P<tile_id>T[^\W_]{5})[.](?P<acquisition_ts>(?P<year>\d{4})(?P<day_of_year>\d{3})T(?P<hour>\d{2})(?P<minute>\d{2})(?P<second>\d{2}))[.](?P<collection_version>v\d+[.]\d+))$'
+    - '(?P<id>(?P<product_shortname>HLS[.]S30)[.](?P<tile_id>T[^\W_]{5})[.](?P<acquisition_ts>(?P<year>\d{4})(?P<day_of_year>\d{3})T(?P<hour>\d{2})(?P<minute>\d{2})(?P<second>\d{2}))[.](?P<collection_version>v\d+[.]\d+))$'
+output_base_name: OPERA_L3_DSWx_HLS_{tile_id}_{acquisition_ts}Z_{creation_ts}Z_{sensor}_30_{collection_version}
